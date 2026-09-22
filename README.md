@@ -1,5 +1,80 @@
 # Excel writer — P0
 
+## Simple reports with YAML
+
+Put locations in `layout.yml`; test scripts provide only field names and data.
+Each sheet has its own mappings, so the same names can be reused across sheets.
+
+```yaml
+sheets:
+  A:
+    customerName:
+      type: cell
+      range: B1
+    items:
+      type: table
+      range: A2:C2
+      hasHeader: true
+      limit: 5
+  B:
+    customerName:
+      type: cell
+      range: D1
+    items:
+      type: table
+      range: B4:D4
+      hasHeader: false
+      limit: 10
+```
+
+```java
+import io.github.ajayrakde.excel.ExcelReport;
+
+try (var excel = ExcelReport.open("template.xlsx", "layout.yml")) {
+    var sheetA = excel.sheet("A");
+    sheetA.set("customerName", "Ajay");
+    sheetA.table("items")
+        .addRow(1, "Notebook", 50)
+        .addRow(2, "Pen", 10)
+        .addRow(3, "Pencil", 5)
+        .addRow(4, "Eraser", 8)
+        .addRow(5, "Ruler", 15);
+
+    var sheetB = excel.sheet("B");
+    sheetB.set("customerName", "Vijay");
+    sheetB.table("items")
+        .addRow(1, "Notebook", 50);
+
+    excel.save("output.xlsx");
+}
+```
+
+- A table `range` describes **only its first row** and fixes the columns. For
+  `A2:C2`, every supplied row must contain exactly three values.
+- `hasHeader: true` preserves that row and starts data on the next row. With
+  `false`, data starts on the configured row. The flag is required for tables;
+  the library does not infer or generate headings.
+- Optional `limit` is a positive maximum number of **data rows**, excluding
+  headers. Fewer rows are allowed. Omit it for growth up to the XLSX row limit.
+- No end-only, open-column, or multi-row table range syntax is accepted here.
+- Numbering is explicit in `addRow`; no automatic sequence is generated.
+- Configured sheet names must already exist in the template. Unknown keys,
+  duplicate YAML keys, unsupported properties, and wrong operation types fail.
+- `set`/`addRow` buffer data; rows are copied and validated when added. Invalid
+  additions leave the buffer unchanged. All queued writes are checked for merged
+  overlaps before `save` modifies workbook cells or opens the output file.
+- Repeated `table(name)` calls share the same builder. Repeated saves write the
+  buffered rows at the same locations; they do not duplicate rows. Subsequent
+  `addRow` calls append to the buffer. `close()` does not save automatically.
+- Zero added rows leave a table unchanged. Cells beyond supplied rows are not
+  cleared, so use a clean template when old data should not remain.
+- Keep configured destinations distinct: overlapping mappings are not detected;
+  cell writes apply before table writes. Header preservation concerns the table
+  operation itself, not another mapping explicitly targeting those cells.
+
+See `examples/layout.yml` for a complete layout. Existing address-based and
+properties-mapper APIs below remain available and unchanged.
+
 A small Java 17 library for writing explicit cells and rectangular ranges in XLSX
 files. Apache POI is internal. An optional mapper connects your own names to
 addresses; sheet selection stays separate so a layout works on multiple sheets.

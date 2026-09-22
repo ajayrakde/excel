@@ -1,0 +1,19 @@
+sheets:
+  A:
+    customerName:
+      type: cell
+      range: B1
+    items:
+      type: table
+      range: A2:C2
+      hasHeader: true
+      limit: 5
+  B:
+    customerName:
+      type: cell
+      range: D1
+    items:
+      type: table
+      range: B4:D4
+      hasHeader: true
+      limit: 10
