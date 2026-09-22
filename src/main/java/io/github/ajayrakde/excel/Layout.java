@@ -80,11 +80,11 @@ final class Layout {
                         var parsedHeaders = new java.util.ArrayList<String>();
                         var unique = new HashSet<String>();
                         for (Object item : configured) {
-                            String header = text(item, context + ".headers");
-                            if (!unique.add(header)) {
-                                throw new IllegalArgumentException(context + ": duplicate header " + header);
+                            String headerName = text(item, context + ".headers");
+                            if (!unique.add(headerName)) {
+                                throw new IllegalArgumentException(context + ": duplicate header " + headerName);
                             }
-                            parsedHeaders.add(header);
+                            parsedHeaders.add(headerName);
                         }
                         headers = List.copyOf(parsedHeaders);
                     }
