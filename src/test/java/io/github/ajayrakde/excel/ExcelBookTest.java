@@ -43,7 +43,9 @@ class ExcelBookTest {
             sheets:
               A:
                 customerName: {type: cell, range: B1}
-                items: {type: table, range: 'A2:C2', hasHeader: true, limit: 5}
+                summary: {type: row, range: 'E1:G1'}
+                items: {type: table, range: 'A2:C2', hasHeader: true, limit: 5,
+                        headers: [number, itemName, price]}
               B:
                 customerName: {type: cell, range: D1}
                 items: {type: table, range: 'B4:D4', hasHeader: false}
@@ -51,11 +53,13 @@ class ExcelBookTest {
         Path output = directory.resolve("output.xlsx");
         try (var report = ExcelBook.open(input.toString(), config.toString())) {
             var a = report.sheet("A");
-            a.set("customerName", "Ajay");
+            a.cell("customerName").set("Ajay");
+            a.row("summary").set("Total", "", 60);
             var items = a.table("items");
             assertSame(items, report.sheet("A").table("items"));
-            items.addRow(1, "Notebook", 50).addRow(2, "Pen", 10);
-            report.sheet("B").set("customerName", "Vijay");
+            items.addRow().set("itemName", "Notebook").set("number", 1).set("price", 50);
+            items.addRow().set("items.price", 10).set("items.number", 2).set("items.itemName", "Pen");
+            report.sheet("B").cell("customerName").set("Vijay");
             report.sheet("B").table("items").addRow(1, "Pencil", 5).addRow(2, null, 15);
             report.save(output.toString());
             items.addRow(3, "Pencil", 5).addRow(4, "Eraser", 8).addRow(5, "Ruler", 15);
@@ -66,6 +70,8 @@ class ExcelBookTest {
             var a = book.getSheet("A");
             assertEquals("Name", a.getRow(0).getCell(0).getStringCellValue());
             assertEquals("Ajay", a.getRow(0).getCell(1).getStringCellValue());
+            assertEquals("Total", a.getRow(0).getCell(4).getStringCellValue());
+            assertEquals(60, a.getRow(0).getCell(6).getNumericCellValue());
             assertEquals("Item name", a.getRow(1).getCell(1).getStringCellValue());
             assertEquals(1, a.getRow(2).getCell(0).getNumericCellValue());
             assertEquals("Notebook", a.getRow(2).getCell(1).getStringCellValue());
@@ -91,7 +97,7 @@ class ExcelBookTest {
         Path output = directory.resolve("output.xlsx");
         Files.writeString(output, "existing output");
         try (var report = ExcelBook.open(template(true), config)) {
-            report.sheet("A").set("customerName", "Ajay");
+            report.sheet("A").cell("customerName").set("Ajay");
             var table = report.sheet("A").table("items");
             assertThrows(IllegalArgumentException.class, () -> table.addRow(1, "too short"));
             assertThrows(IllegalArgumentException.class, () -> table.addRow(1, "invalid", new Object()));
@@ -122,7 +128,10 @@ class ExcelBookTest {
         "{type: table, range: 'A2:C2', hasHeader: false, typo: 1}",
         "{type: cell, range: 'A1:B1'}",
         "{type: cell, range: 'A1', hasHeader: true}",
-        "{type: row, range: 'A1:B1'}",
+        "{type: row, range: 'A1:B2'}",
+        "{type: table, range: 'A2:C2', hasHeader: true, headers: [number, item]}",
+        "{type: table, range: 'A2:C2', hasHeader: true, headers: [number, item, number]}",
+        "{type: table, range: 'A2:C2', hasHeader: true, headers: [number, item, 3]}",
         "{type: table, range: 'A1048576:C1048576', hasHeader: true}",
         "{type: table, range: 'A1048575:C1048575', hasHeader: false, limit: 3}"
     })
@@ -154,17 +163,27 @@ class ExcelBookTest {
             sheets:
               A:
                 name: {type: cell, range: B1}
-                items: {type: table, range: 'A2:C2', hasHeader: true}
+                summary: {type: row, range: 'E1:G1'}
+                items: {type: table, range: 'A2:C2', hasHeader: true,
+                        headers: [number, itemName, price]}
             """);
         var report = ExcelBook.open(input, config);
         var sheet = report.sheet("A");
         var table = sheet.table("items");
         assertThrows(IllegalArgumentException.class, () -> report.sheet("B"));
-        assertThrows(IllegalArgumentException.class, () -> sheet.set("missing", "value"));
-        assertThrows(IllegalArgumentException.class, () -> sheet.set("items", "value"));
+        assertThrows(IllegalArgumentException.class, () -> sheet.cell("missing"));
+        assertThrows(IllegalArgumentException.class, () -> sheet.cell("items"));
+        assertThrows(IllegalArgumentException.class, () -> sheet.row("name"));
+        assertThrows(IllegalArgumentException.class, () -> sheet.table("summary"));
         assertThrows(IllegalArgumentException.class, () -> sheet.table("name"));
+        var cell = sheet.cell("name");
+        var row = sheet.row("summary");
+        var namedTableRow = table.addRow();
+        assertThrows(IllegalArgumentException.class, () -> namedTableRow.set("unknown", 1));
         report.close();
-        assertThrows(IllegalStateException.class, () -> sheet.set("name", "value"));
+        assertThrows(IllegalStateException.class, () -> cell.set("value"));
+        assertThrows(IllegalStateException.class, () -> row.set(1, 2, 3));
+        assertThrows(IllegalStateException.class, () -> namedTableRow.set("number", 1));
         assertThrows(IllegalStateException.class, () -> table.addRow(1, "item", 5));
     }
 

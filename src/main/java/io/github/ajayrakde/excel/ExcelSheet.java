@@ -1,10 +1,10 @@
 package io.github.ajayrakde.excel;
 
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.util.CellRangeAddress;
 
@@ -22,12 +22,14 @@ public final class ExcelSheet {
         this.fields = fields;
     }
 
-    /** Buffers a cell value; a later call with the same name replaces it. */
-    public ExcelSheet set(String name, Object value) {
+    public NamedCell cell(String name) {
         field(name, "cell");
-        validateValue(value);
-        values.put(name, value);
-        return this;
+        return new NamedCell(name);
+    }
+
+    public NamedRow row(String name) {
+        field(name, "row");
+        return new NamedRow(name);
     }
 
     /** Returns the same table for repeated calls, so rows continue appending. */
@@ -78,10 +80,10 @@ public final class ExcelSheet {
 
     void write(Address address, Object data) {
         for (int r = 0; r < address.rows(); r++) {
-            Row row = sheet.getRow(address.firstRow() + r);
+            org.apache.poi.ss.usermodel.Row row = sheet.getRow(address.firstRow() + r);
             if (row == null) row = sheet.createRow(address.firstRow() + r);
             for (int c = 0; c < address.columns(); c++) {
-                Cell cell = row.getCell(address.firstColumn() + c);
+                org.apache.poi.ss.usermodel.Cell cell = row.getCell(address.firstColumn() + c);
                 if (cell == null) cell = row.createCell(address.firstColumn() + c);
                 Object value = data instanceof List<?> rows ? ((List<?>) rows.get(r)).get(c) : data;
                 cell.setBlank();
@@ -111,5 +113,35 @@ public final class ExcelSheet {
     private static IllegalArgumentException shape(Address address) {
         return new IllegalArgumentException("Data must exactly match destination: "
                 + address.rows() + " row(s) x " + address.columns() + " column(s)");
+    }
+
+    public final class NamedCell {
+        private final String name;
+
+        private NamedCell(String name) { this.name = name; }
+
+        public NamedCell set(Object value) {
+            book.ensureOpen();
+            validateValue(value);
+            values.put(name, value);
+            return this;
+        }
+    }
+
+    public final class NamedRow {
+        private final String name;
+
+        private NamedRow(String name) { this.name = name; }
+
+        public NamedRow set(Object... rowValues) {
+            book.ensureOpen();
+            int width = fields.get(name).address().columns();
+            if (rowValues == null || rowValues.length != width) {
+                throw new IllegalArgumentException(name + ": row requires " + width + " values");
+            }
+            for (Object value : rowValues) validateValue(value);
+            values.put(name, List.of(new ArrayList<>(Arrays.asList(rowValues))));
+            return this;
+        }
     }
 }

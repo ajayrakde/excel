@@ -6,15 +6,17 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.HashSet;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 /** Parses and validates the internal YAML layout model. */
 final class Layout {
-    record Field(String type, Address address, boolean hasHeader, Integer limit) {}
+    record Field(String type, Address address, boolean hasHeader, Integer limit, List<String> headers) {}
 
     static Map<String, Map<String, Field>> load(Path path) throws IOException {
         LoaderOptions options = new LoaderOptions();
@@ -39,11 +41,12 @@ final class Layout {
                 String context = sheet + "." + name;
                 Map<?, ?> config = mapping(field.getValue(), context);
                 String type = text(config.get("type"), context + ".type");
-                if (!Set.of("cell", "table").contains(type)) {
-                    throw new IllegalArgumentException(context + ": type must be cell or table");
+                if (!Set.of("cell", "row", "table").contains(type)) {
+                    throw new IllegalArgumentException(context + ": type must be cell, row or table");
                 }
-                keys(config, type.equals("cell") ? Set.of("type", "range")
-                        : Set.of("type", "range", "hasHeader", "limit"), context);
+                keys(config, type.equals("table")
+                        ? Set.of("type", "range", "hasHeader", "limit", "headers")
+                        : Set.of("type", "range"), context);
                 String range = text(config.get("range"), context + ".range");
                 Address address;
                 try { address = Address.parse(range); }
@@ -52,10 +55,11 @@ final class Layout {
                 }
                 if (address.rows() != 1 || (type.equals("cell") && address.columns() != 1)) {
                     throw new IllegalArgumentException(context + ": range must identify "
-                            + (type.equals("cell") ? "one cell" : "only the first row, such as A2:C2"));
+                            + (type.equals("cell") ? "one cell" : "one row, such as A2:C2"));
                 }
                 boolean hasHeader = false;
                 Integer limit = null;
+                List<String> headers = List.of();
                 if (type.equals("table")) {
                     if (!(config.get("hasHeader") instanceof Boolean header)) {
                         throw new IllegalArgumentException(context + ": hasHeader must be true or false");
@@ -67,12 +71,29 @@ final class Layout {
                         }
                         limit = count;
                     }
+                    if (config.containsKey("headers")) {
+                        if (!(config.get("headers") instanceof List<?> configured)
+                                || configured.size() != address.columns()) {
+                            throw new IllegalArgumentException(context + ": headers must contain exactly "
+                                    + address.columns() + " names");
+                        }
+                        var parsedHeaders = new java.util.ArrayList<String>();
+                        var unique = new HashSet<String>();
+                        for (Object item : configured) {
+                            String header = text(item, context + ".headers");
+                            if (!unique.add(header)) {
+                                throw new IllegalArgumentException(context + ": duplicate header " + header);
+                            }
+                            parsedHeaders.add(header);
+                        }
+                        headers = List.copyOf(parsedHeaders);
+                    }
                     long firstDataRow = address.firstRow() + (hasHeader ? 1L : 0L);
                     if (firstDataRow >= 1_048_576 || (limit != null && firstDataRow + limit > 1_048_576)) {
                         throw new IllegalArgumentException(context + ": table exceeds XLSX row limit");
                     }
                 }
-                parsed.put(name, new Field(type, address, hasHeader, limit));
+                parsed.put(name, new Field(type, address, hasHeader, limit, headers));
             }
             result.put(sheet, Map.copyOf(parsed));
         }

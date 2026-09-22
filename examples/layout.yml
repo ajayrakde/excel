@@ -3,11 +3,15 @@ sheets:
     customerName:
       type: cell
       range: B1
+    summary:
+      type: row
+      range: E1:G1
     items:
       type: table
       range: A2:C2
       hasHeader: true
       limit: 5
+      headers: [number, itemName, price]
   B:
     customerName:
       type: cell
@@ -17,3 +21,4 @@ sheets:
       range: B4:D4
       hasHeader: true
       limit: 10
+      headers: [number, itemName, price]
