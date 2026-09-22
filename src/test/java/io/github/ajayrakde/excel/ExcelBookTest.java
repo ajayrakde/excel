@@ -11,7 +11,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-class ExcelReportTest {
+class ExcelBookTest {
     @TempDir Path directory;
 
     private Path template(boolean merge) throws Exception {
@@ -49,7 +49,7 @@ class ExcelReportTest {
                 items: {type: table, range: 'B4:D4', hasHeader: false}
             """);
         Path output = directory.resolve("output.xlsx");
-        try (var report = ExcelReport.open(input.toString(), config.toString())) {
+        try (var report = ExcelBook.open(input.toString(), config.toString())) {
             var a = report.sheet("A");
             a.set("customerName", "Ajay");
             var items = a.table("items");
@@ -90,7 +90,7 @@ class ExcelReportTest {
             """);
         Path output = directory.resolve("output.xlsx");
         Files.writeString(output, "existing output");
-        try (var report = ExcelReport.open(template(true), config)) {
+        try (var report = ExcelBook.open(template(true), config)) {
             report.sheet("A").set("customerName", "Ajay");
             var table = report.sheet("A").table("items");
             assertThrows(IllegalArgumentException.class, () -> table.addRow(1, "too short"));
@@ -99,7 +99,7 @@ class ExcelReportTest {
             assertThrows(IllegalArgumentException.class, () -> report.save(output));
             assertEquals("existing output", Files.readString(output));
         }
-        try (var report = ExcelReport.open(template(false), config)) {
+        try (var report = ExcelBook.open(template(false), config)) {
             report.sheet("A").table("items");
             report.save(output);
         }
@@ -128,7 +128,7 @@ class ExcelReportTest {
     })
     void rejectsInvalidConfiguration(String field) throws Exception {
         Path config = layout("sheets:\n  A:\n    items: " + field + "\n");
-        assertThrows(IllegalArgumentException.class, () -> ExcelReport.open(directory.resolve("unused.xlsx"), config));
+        assertThrows(IllegalArgumentException.class, () -> ExcelBook.open(directory.resolve("unused.xlsx"), config));
     }
 
     @Test void rejectsDuplicateYamlKeys() throws Exception {
@@ -138,7 +138,7 @@ class ExcelReportTest {
                 name: {type: cell, range: B1}
                 name: {type: cell, range: C1}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ReportLayout.load(config));
+        assertThrows(IllegalArgumentException.class, () -> Layout.load(config));
     }
 
     @Test void rejectsMissingSheetsUnknownNamesAndWrongOperationsAndClosedHandles() throws Exception {
@@ -149,14 +149,14 @@ class ExcelReportTest {
                 name: {type: cell, range: B1}
             """);
         Path missingConfig = config;
-        assertThrows(IllegalArgumentException.class, () -> ExcelReport.open(input, missingConfig));
+        assertThrows(IllegalArgumentException.class, () -> ExcelBook.open(input, missingConfig));
         config = layout("""
             sheets:
               A:
                 name: {type: cell, range: B1}
                 items: {type: table, range: 'A2:C2', hasHeader: true}
             """);
-        var report = ExcelReport.open(input, config);
+        var report = ExcelBook.open(input, config);
         var sheet = report.sheet("A");
         var table = sheet.table("items");
         assertThrows(IllegalArgumentException.class, () -> report.sheet("B"));
@@ -174,7 +174,7 @@ class ExcelReportTest {
               A:
                 items: {type: table, range: 'A1048576:A1048576', hasHeader: false}
             """);
-        try (var report = ExcelReport.open(template(false), config)) {
+        try (var report = ExcelBook.open(template(false), config)) {
             var table = report.sheet("A").table("items").addRow(1);
             assertThrows(IllegalArgumentException.class, () -> table.addRow(2));
         }

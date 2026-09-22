@@ -12,9 +12,9 @@ import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 
-/** Validated, sheet-scoped YAML configuration. */
-final class ReportLayout {
-    record Field(String type, String range, Address address, boolean hasHeader, Integer limit) {}
+/** Parses and validates the internal YAML layout model. */
+final class Layout {
+    record Field(String type, Address address, boolean hasHeader, Integer limit) {}
 
     static Map<String, Map<String, Field>> load(Path path) throws IOException {
         LoaderOptions options = new LoaderOptions();
@@ -65,18 +65,18 @@ final class ReportLayout {
                         if (!(config.get("limit") instanceof Integer count) || count < 1) {
                             throw new IllegalArgumentException(context + ": limit must be a positive integer");
                         }
-                        limit = (Integer) config.get("limit");
+                        limit = count;
                     }
                     long firstDataRow = address.firstRow() + (hasHeader ? 1L : 0L);
                     if (firstDataRow >= 1_048_576 || (limit != null && firstDataRow + limit > 1_048_576)) {
                         throw new IllegalArgumentException(context + ": table exceeds XLSX row limit");
                     }
                 }
-                parsed.put(name, new Field(type, range, address, hasHeader, limit));
+                parsed.put(name, new Field(type, address, hasHeader, limit));
             }
             result.put(sheet, Map.copyOf(parsed));
         }
-        return result;
+        return Map.copyOf(result);
     }
 
     private static Map<?, ?> mapping(Object value, String context) {

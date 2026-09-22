@@ -1,9 +1,10 @@
-# Excel writer — P0
+# Excel writer
 
-## Simple reports with YAML
+A small Java 17 library that fills named cells and tables in an existing XLSX
+template. Test scripts use names from a YAML layout and never handle cell
+coordinates in Java.
 
-Put locations in `layout.yml`; test scripts provide only field names and data.
-Each sheet has its own mappings, so the same names can be reused across sheets.
+## Layout
 
 ```yaml
 sheets:
@@ -16,6 +17,7 @@ sheets:
       range: A2:C2
       hasHeader: true
       limit: 5
+
   B:
     customerName:
       type: cell
@@ -27,10 +29,22 @@ sheets:
       limit: 10
 ```
 
-```java
-import io.github.ajayrakde.excel.ExcelReport;
+For a cell, `range` is its exact address. For a table, `range` is its first row
+and fixes the number of columns. A table never needs an ending row.
 
-try (var excel = ExcelReport.open("template.xlsx", "layout.yml")) {
+- `hasHeader: true` preserves the configured row and starts data on the next row.
+- `hasHeader: false` starts data on the configured row.
+- `limit` is optional. It caps data rows and does not count the header.
+- Each configured worksheet must already exist in the template.
+
+See [`examples/layout.yml`](examples/layout.yml) for a complete example.
+
+## Consumer code
+
+```java
+import io.github.ajayrakde.excel.ExcelBook;
+
+try (var excel = ExcelBook.open("template.xlsx", "layout.yml")) {
     var sheetA = excel.sheet("A");
     sheetA.set("customerName", "Ajay");
     sheetA.table("items")
@@ -49,94 +63,40 @@ try (var excel = ExcelReport.open("template.xlsx", "layout.yml")) {
 }
 ```
 
-- A table `range` describes **only its first row** and fixes the columns. For
-  `A2:C2`, every supplied row must contain exactly three values.
-- `hasHeader: true` preserves that row and starts data on the next row. With
-  `false`, data starts on the configured row. The flag is required for tables;
-  the library does not infer or generate headings.
-- Optional `limit` is a positive maximum number of **data rows**, excluding
-  headers. Fewer rows are allowed. Omit it for growth up to the XLSX row limit.
-- No end-only, open-column, or multi-row table range syntax is accepted here.
-- Numbering is explicit in `addRow`; no automatic sequence is generated.
-- Configured sheet names must already exist in the template. Unknown keys,
-  duplicate YAML keys, unsupported properties, and wrong operation types fail.
-- `set`/`addRow` buffer data; rows are copied and validated when added. Invalid
-  additions leave the buffer unchanged. All queued writes are checked for merged
-  overlaps before `save` modifies workbook cells or opens the output file.
-- Repeated `table(name)` calls share the same builder. Repeated saves write the
-  buffered rows at the same locations; they do not duplicate rows. Subsequent
-  `addRow` calls append to the buffer. `close()` does not save automatically.
-- Zero added rows leave a table unchanged. Cells beyond supplied rows are not
-  cleared, so use a clean template when old data should not remain.
-- Keep configured destinations distinct: overlapping mappings are not detected;
-  cell writes apply before table writes. Header preservation concerns the table
-  operation itself, not another mapping explicitly targeting those cells.
+The public API has three concepts:
 
-See `examples/layout.yml` for a complete layout. YAML is the only supported
-named-layout configuration format.
+| Class | Purpose |
+| --- | --- |
+| `ExcelBook` | Opens the template and layout, selects sheets, saves and closes |
+| `ExcelSheet` | Sets a named cell and selects a named table |
+| `ExcelTable` | Adds rows to the selected table |
 
-A small Java 17 library for writing explicit cells and rectangular ranges in XLSX
-files. Apache POI is internal. The direct address API remains available for
-low-level use without configuration.
+`Layout` and `Address` are package-private implementation details.
 
-## Usage
+## Behavior
 
-```java
-import io.github.ajayrakde.excel.ExcelBook;
-import java.nio.file.Path;
-import java.util.List;
+- Supported cell values are strings, booleans, finite byte/short/int/long/float/
+  double values, and `null`. A null clears the target cell.
+- Strings beginning with `=` remain literal strings; formulas are not generated.
+- Every table row must contain exactly the number of columns declared by its range.
+- Numbering is explicit data supplied to `addRow`; it is not generated.
+- Unknown sheets or names, incorrect types, invalid ranges, duplicate YAML keys,
+  unsupported YAML properties, bad values, and row-limit overflow fail clearly.
+- Pending writes are validated for merged-cell conflicts before `save` modifies
+  workbook cells or opens the output file.
+- Existing cell formatting is retained when a value is replaced.
+- Empty tables leave the template unchanged. Cells below supplied data are not
+  cleared, so start with a clean template when old data must not remain.
+- Repeated calls to `table(name)` return the same table and continue appending.
+  Repeated saves write buffered rows to the same locations without duplication.
+- `close()` releases the workbook and does not save automatically.
 
-try (ExcelBook book = ExcelBook.create()) {
-    var sheet = book.sheet("January");
-    sheet.write("B6", "Ajay");
-    sheet.write("B12:D12", List.of("Product", 2, 500));
-    sheet.write("G12:G14", List.of(1000, 1500, 800));
-    sheet.write("A25:B27", List.of(
-        List.of("Name", "Amount"),
-        List.of("A", 100),
-        List.of("B", 200)
-    ));
-    book.save(Path.of("output.xlsx"));
-}
+## Build
+
+Requires JDK 17 and Gradle 8.14.3:
+
+```shell
+gradle build
 ```
 
-Use `ExcelBook.open(Path.of("template.xlsx"))` to edit a template. `sheet(name)`
-selects an existing sheet or creates it. `save(path)` replaces an existing output
-file. Close the workbook with try-with-resources; instances are not thread-safe.
-
-## P0 behavior
-
-| Input | Behavior |
-| --- | --- |
-| Scalar | Exactly one cell |
-| Flat `List<?>` | One row left-to-right or one column top-to-bottom |
-| List of row lists | Rectangular matrix, including one-row/one-column matrices |
-| Size mismatch, empty list, ragged matrix | Rejected before writing |
-| `null` | Clears the destination cell; use `Arrays.asList` for null list elements |
-| Existing cell | Replaces value/formula, retains formatting |
-| Merged overlap | Rejected before writing, including the merge's top-left cell |
-| String | Literal text, including text starting with `=`; max 32767 characters |
-| Boolean | Excel boolean |
-| Byte, Short, Integer, Long, Float, Double | Excel number; must be finite |
-| Other types | Rejected; convert dates/identifiers to text explicitly in P0 |
-
-Ranges are inclusive and must be ordered from top-left to bottom-right. A1
-addresses accept lowercase and `$` markers; sheet-qualified addresses, whole
-rows/columns, and disjoint ranges are not supported. Limits are XLSX limits:
-XFD1048576. Numeric values use Excel's double precision (roughly 15 significant
-digits); use strings for long identifiers or values needing exact decimal text.
-
-Validation of shape, values, and merged overlaps completes before mutation.
-This is not a transactional guarantee against I/O failure, resource exhaustion,
-or concurrent mutation of input lists. No broadcasting, truncation, implicit
-range expansion, or clearing outside the destination occurs.
-
-Search, relative positioning, formatting APIs, formula generation, merge/unmerge,
-object-field mapping, and pattern filling are outside P0.
-
-## Build and test
-
-Requires JDK 17 and Gradle 8.14.3. Run `gradle build` (or `gradle test` for tests only).
-GitHub Actions installs this Gradle version and runs the build on pushes
-and pull requests. Tests reopen generated workbooks to verify actual saved cell
-types, values, shared layouts, template preservation, and validation behavior.
+GitHub Actions runs the complete Gradle build for pushes and pull requests.
