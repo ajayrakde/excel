@@ -138,7 +138,7 @@ class ExcelReportTest {
                 name: {type: cell, range: B1}
                 name: {type: cell, range: C1}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ReportLayout.load(config));
+        assertThrows(IllegalArgumentException.class, () -> Layout.load(config));
     }
 
     @Test void rejectsMissingSheetsUnknownNamesAndWrongOperationsAndClosedHandles() throws Exception {

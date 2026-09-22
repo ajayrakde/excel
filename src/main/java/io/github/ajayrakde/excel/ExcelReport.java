@@ -1,19 +1,28 @@
 package io.github.ajayrakde.excel;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
-/** YAML-configured report. Writes are buffered until save; close does not save. Not thread-safe. */
+/** Entry point for filling an XLSX template from a YAML layout. Not thread-safe. */
 public final class ExcelReport implements AutoCloseable {
-    private final ExcelBook book;
-    private final Map<String, ReportSheet> sheets = new LinkedHashMap<>();
+    private final XSSFWorkbook workbook;
+    private final Map<String, ExcelSheet> sheets = new LinkedHashMap<>();
+    private boolean closed;
 
-    private ExcelReport(ExcelBook book, Map<String, Map<String, ReportLayout.Field>> layout) {
-        this.book = book;
-        layout.forEach((name, fields) -> sheets.put(name,
-                new ReportSheet(book, book.existingSheet(name), fields)));
+    private ExcelReport(XSSFWorkbook workbook, Map<String, Map<String, Layout.Field>> layout) {
+        this.workbook = workbook;
+        layout.forEach((name, fields) -> {
+            Sheet sheet = workbook.getSheet(name);
+            if (sheet == null) throw new IllegalArgumentException("Template has no sheet: " + name);
+            sheets.put(name, new ExcelSheet(this, sheet, fields));
+        });
     }
 
     public static ExcelReport open(String template, String layout) throws IOException {
@@ -21,32 +30,46 @@ public final class ExcelReport implements AutoCloseable {
     }
 
     public static ExcelReport open(Path template, Path layout) throws IOException {
-        var config = ReportLayout.load(layout);
-        ExcelBook book = ExcelBook.open(template);
+        var config = Layout.load(layout);
+        XSSFWorkbook workbook;
+        try (InputStream input = Files.newInputStream(template)) {
+            workbook = new XSSFWorkbook(input);
+        }
         try {
-            return new ExcelReport(book, config);
+            return new ExcelReport(workbook, config);
         } catch (RuntimeException error) {
-            try { book.close(); } catch (IOException closeError) { error.addSuppressed(closeError); }
+            try { workbook.close(); } catch (IOException closeError) { error.addSuppressed(closeError); }
             throw error;
         }
     }
 
-    public ReportSheet sheet(String name) {
-        book.ensureOpen();
-        ReportSheet sheet = sheets.get(name);
+    public ExcelSheet sheet(String name) {
+        ensureOpen();
+        ExcelSheet sheet = sheets.get(name);
         if (sheet == null) throw new IllegalArgumentException("Unknown configured sheet: " + name);
         return sheet;
     }
 
     public void save(String output) throws IOException { save(Path.of(output)); }
 
-    /** Validates all pending destinations before modifying the workbook or opening the output file. */
+    /** Validates every pending write before changing workbook cells or opening the output file. */
     public void save(Path output) throws IOException {
-        book.ensureOpen();
-        sheets.values().forEach(ReportSheet::validate);
-        sheets.values().forEach(ReportSheet::apply);
-        book.save(output);
+        ensureOpen();
+        sheets.values().forEach(ExcelSheet::validate);
+        sheets.values().forEach(ExcelSheet::apply);
+        try (OutputStream stream = Files.newOutputStream(output)) {
+            workbook.write(stream);
+        }
     }
 
-    @Override public void close() throws IOException { book.close(); }
+    void ensureOpen() {
+        if (closed) throw new IllegalStateException("Report is closed");
+    }
+
+    @Override public void close() throws IOException {
+        if (!closed) {
+            closed = true;
+            workbook.close();
+        }
+    }
 }

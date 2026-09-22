@@ -3,23 +3,22 @@ package io.github.ajayrakde.excel;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.poi.ss.util.CellRangeAddress;
 
-/** Collects data rows with fixed width and an optional maximum row count. */
-public final class ReportTable {
-    private final ExcelBook book;
+/** Rows for one configured table. */
+public final class ExcelTable {
+    private final ExcelReport report;
     private final String name;
-    private final ReportLayout.Field config;
+    private final Layout.Field config;
     private final List<List<Object>> rows = new ArrayList<>();
 
-    ReportTable(ExcelBook book, String name, ReportLayout.Field config) {
-        this.book = book;
+    ExcelTable(ExcelReport report, String name, Layout.Field config) {
+        this.report = report;
         this.name = name;
         this.config = config;
     }
 
-    public ReportTable addRow(Object... values) {
-        book.ensureOpen();
+    public ExcelTable addRow(Object... values) {
+        report.ensureOpen();
         if (values == null || values.length != config.address().columns()) {
             throw new IllegalArgumentException(name + ": each row requires " + config.address().columns() + " values");
         }
@@ -38,13 +37,13 @@ public final class ReportTable {
         return config.address().firstRow() + (config.hasHeader() ? 1 : 0);
     }
 
-    private String destination() {
-        return new CellRangeAddress(firstDataRow(), firstDataRow() + rows.size() - 1,
-                config.address().firstColumn(), config.address().lastColumn()).formatAsString();
+    private Address destination() {
+        return new Address(firstDataRow(), config.address().firstColumn(),
+                firstDataRow() + rows.size() - 1, config.address().lastColumn());
     }
 
     void validate(ExcelSheet sheet) {
-        if (!rows.isEmpty()) sheet.validate(destination(), rows);
+        if (!rows.isEmpty()) sheet.validateRange(destination(), rows);
     }
 
     void apply(ExcelSheet sheet) {
