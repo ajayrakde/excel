@@ -4,9 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -18,16 +16,15 @@ import org.junit.jupiter.params.provider.ValueSource;
 class ExcelTest {
     @TempDir Path directory;
 
-    @Test void writesAllFourShapesAndReusesMappingAcrossSheets() throws Exception {
+    @Test void writesAllFourShapesAcrossSheets() throws Exception {
         Path output = directory.resolve("out.xlsx");
-        ExcelMapper mapper = ExcelMapper.of(Map.of("sales.items", "C5:D6"));
         try (ExcelBook book = ExcelBook.create()) {
             book.sheet("January")
                 .write("B2", "Ajay")
                 .write("B3:D3", List.of("Item", 2, true))
                 .write("F3:F5", List.of(10, 20, 30))
-                .write(mapper.resolve("sales.items"), List.of(List.of("A", 100), List.of("B", 200)));
-            book.sheet("February").write(mapper.resolve("sales.items"),
+                .write("C5:D6", List.of(List.of("A", 100), List.of("B", 200)));
+            book.sheet("February").write("C5:D6",
                 List.of(List.of("C", 300), List.of("D", 400)));
             book.save(output);
         }
@@ -106,29 +103,13 @@ class ExcelTest {
     @ParameterizedTest
     @ValueSource(strings = {"", "A0", "XFE1", "A1048577", "B2:A1", "A1:B2:C3", "Sheet!A1", "A:A", "1:2", "A1:"})
     void rejectsInvalidAddresses(String address) {
-        assertThrows(IllegalArgumentException.class, () -> ExcelMapper.of(Map.of("key", address)));
+        assertThrows(IllegalArgumentException.class, () -> Address.parse(address));
     }
 
     @Test void parsesAbsoluteLowercaseAndBoundaryAddresses() {
         assertEquals(new Address(0, 0, 1, 1), Address.parse(" $a$1:$b$2 "));
         assertEquals(new Address(1048575, 16383, 1048575, 16383), Address.parse("XFD1048576"));
         assertThrows(IllegalArgumentException.class, () -> Address.parse(null));
-    }
-
-    @Test void mapperIsIndependentImmutableAndLoadsProperties() throws Exception {
-        Map<String, String> source = new HashMap<>(Map.of("items", "A1:B2", "alias", "A1:B2"));
-        ExcelMapper mapper = ExcelMapper.of(source);
-        source.put("items", "D4");
-        assertEquals("A1:B2", mapper.resolve("items"));
-        assertEquals(mapper.resolve("items"), mapper.resolve("alias"));
-        assertThrows(IllegalArgumentException.class, () -> mapper.resolve("missing"));
-        assertThrows(IllegalArgumentException.class, () -> mapper.resolve(null));
-        assertThrows(IllegalArgumentException.class, () -> ExcelMapper.of(Map.of(" ", "A1")));
-        Path config = directory.resolve("layout.properties");
-        Files.writeString(config, "sales.items=A1:B2\nsales.total=B3\n");
-        assertEquals("A1:B2", ExcelMapper.load(config).resolve("sales.items"));
-        Files.writeString(config, "items=A1\nitems=B2\n");
-        assertThrows(IllegalArgumentException.class, () -> ExcelMapper.load(config));
     }
 
     @Test void closedWorkbookRejectsOperations() throws Exception {
