@@ -41,8 +41,8 @@ final class Layout {
                 String context = sheet + "." + name;
                 Map<?, ?> config = mapping(field.getValue(), context);
                 String type = text(config.get("type"), context + ".type");
-                if (!Set.of("cell", "row", "table").contains(type)) {
-                    throw new IllegalArgumentException(context + ": type must be cell, row or table");
+                if (!Set.of("cell", "table").contains(type)) {
+                    throw new IllegalArgumentException(context + ": type must be cell or table");
                 }
                 keys(config, type.equals("table")
                         ? Set.of("type", "range", "hasHeader", "limit", "headers")
@@ -55,7 +55,7 @@ final class Layout {
                 }
                 if (address.rows() != 1 || (type.equals("cell") && address.columns() != 1)) {
                     throw new IllegalArgumentException(context + ": range must identify "
-                            + (type.equals("cell") ? "one cell" : "one row, such as A2:C2"));
+                            + (type.equals("cell") ? "one cell" : "only the first row, such as A2:C2"));
                 }
                 boolean hasHeader = false;
                 Integer limit = null;

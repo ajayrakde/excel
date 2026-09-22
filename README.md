@@ -12,9 +12,6 @@ sheets:
     customerName:
       type: cell
       range: B1
-    summary:
-      type: row
-      range: E1:G1
     items:
       type: table
       range: A2:C2
@@ -33,9 +30,9 @@ sheets:
       limit: 10
 ```
 
-The YAML keys (`customerName`, `summary`, and `items`) are the names used by
-consumer code. A cell has one exact address. A row has one fixed row range. A
-table range is its first row and fixes its columns; it never needs an ending row.
+The YAML keys (`customerName` and `items`) are the names used by consumer code.
+A cell has one exact address. A table range is its first row and fixes its
+columns; it never needs an ending row.
 
 - `hasHeader: true` preserves the configured row and starts data on the next row.
 - `hasHeader: false` starts data on the configured row.
@@ -52,8 +49,7 @@ import io.github.ajayrakde.excel.ExcelBook;
 
 try (var excel = ExcelBook.open("template.xlsx", "layout.yml")) {
     var sheetA = excel.sheet("A");
-    sheetA.cell("customerName").set("Ajay");
-    sheetA.row("summary").set("Total", "", 88);
+    sheetA.set("customerName", "Ajay");
 
     var items = sheetA.table("items");
     items.addRow()
@@ -66,7 +62,7 @@ try (var excel = ExcelBook.open("template.xlsx", "layout.yml")) {
         .set("price", 10);
 
     var sheetB = excel.sheet("B");
-    sheetB.cell("customerName").set("Vijay");
+    sheetB.set("customerName", "Vijay");
     sheetB.table("items")
         .addRow(1, "Notebook", 50);
 
@@ -79,7 +75,7 @@ The public API has three concepts:
 | Class | Purpose |
 | --- | --- |
 | `ExcelBook` | Opens the template and layout, selects sheets, saves and closes |
-| `ExcelSheet` | Selects a named cell, row, or table |
+| `ExcelSheet` | Sets a named cell and selects a named table |
 | `ExcelTable` | Adds positional rows or rows populated by header name |
 
 `Layout` and `Address` are package-private implementation details.

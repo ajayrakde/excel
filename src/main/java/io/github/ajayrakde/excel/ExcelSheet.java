@@ -1,8 +1,6 @@
 package io.github.ajayrakde.excel;
 
 import java.util.LinkedHashMap;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -22,14 +20,12 @@ public final class ExcelSheet {
         this.fields = fields;
     }
 
-    public NamedCell cell(String name) {
+    /** Buffers a named cell value; a later call with the same name replaces it. */
+    public ExcelSheet set(String name, Object value) {
         field(name, "cell");
-        return new NamedCell(name);
-    }
-
-    public NamedRow row(String name) {
-        field(name, "row");
-        return new NamedRow(name);
+        validateValue(value);
+        values.put(name, value);
+        return this;
     }
 
     /** Returns the same table for repeated calls, so rows continue appending. */
@@ -115,33 +111,4 @@ public final class ExcelSheet {
                 + address.rows() + " row(s) x " + address.columns() + " column(s)");
     }
 
-    public final class NamedCell {
-        private final String name;
-
-        private NamedCell(String name) { this.name = name; }
-
-        public NamedCell set(Object value) {
-            book.ensureOpen();
-            validateValue(value);
-            values.put(name, value);
-            return this;
-        }
-    }
-
-    public final class NamedRow {
-        private final String name;
-
-        private NamedRow(String name) { this.name = name; }
-
-        public NamedRow set(Object... rowValues) {
-            book.ensureOpen();
-            int width = fields.get(name).address().columns();
-            if (rowValues == null || rowValues.length != width) {
-                throw new IllegalArgumentException(name + ": row requires " + width + " values");
-            }
-            for (Object value : rowValues) validateValue(value);
-            values.put(name, List.of(new ArrayList<>(Arrays.asList(rowValues))));
-            return this;
-        }
-    }
 }

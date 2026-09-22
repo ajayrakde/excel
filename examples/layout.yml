@@ -3,9 +3,6 @@ sheets:
     customerName:
       type: cell
       range: B1
-    summary:
-      type: row
-      range: E1:G1
     items:
       type: table
       range: A2:C2
