@@ -10,14 +10,14 @@ import org.apache.poi.ss.util.CellRangeAddress;
 
 /** A configured worksheet containing named cells and tables. */
 public final class ExcelSheet {
-    private final ExcelReport report;
+    private final ExcelBook book;
     private final Sheet sheet;
     private final Map<String, Layout.Field> fields;
     private final Map<String, Object> values = new LinkedHashMap<>();
     private final Map<String, ExcelTable> tables = new LinkedHashMap<>();
 
-    ExcelSheet(ExcelReport report, Sheet sheet, Map<String, Layout.Field> fields) {
-        this.report = report;
+    ExcelSheet(ExcelBook book, Sheet sheet, Map<String, Layout.Field> fields) {
+        this.book = book;
         this.sheet = sheet;
         this.fields = fields;
     }
@@ -33,11 +33,11 @@ public final class ExcelSheet {
     /** Returns the same table for repeated calls, so rows continue appending. */
     public ExcelTable table(String name) {
         Layout.Field config = field(name, "table");
-        return tables.computeIfAbsent(name, ignored -> new ExcelTable(report, name, config));
+        return tables.computeIfAbsent(name, ignored -> new ExcelTable(book, name, config));
     }
 
     private Layout.Field field(String name, String expected) {
-        report.ensureOpen();
+        book.ensureOpen();
         Layout.Field field = name == null ? null : fields.get(name);
         if (field == null) throw new IllegalArgumentException("Unknown field: " + name);
         if (!field.type().equals(expected)) {

@@ -11,12 +11,12 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 /** Entry point for filling an XLSX template from a YAML layout. Not thread-safe. */
-public final class ExcelReport implements AutoCloseable {
+public final class ExcelBook implements AutoCloseable {
     private final XSSFWorkbook workbook;
     private final Map<String, ExcelSheet> sheets = new LinkedHashMap<>();
     private boolean closed;
 
-    private ExcelReport(XSSFWorkbook workbook, Map<String, Map<String, Layout.Field>> layout) {
+    private ExcelBook(XSSFWorkbook workbook, Map<String, Map<String, Layout.Field>> layout) {
         this.workbook = workbook;
         layout.forEach((name, fields) -> {
             Sheet sheet = workbook.getSheet(name);
@@ -25,18 +25,18 @@ public final class ExcelReport implements AutoCloseable {
         });
     }
 
-    public static ExcelReport open(String template, String layout) throws IOException {
+    public static ExcelBook open(String template, String layout) throws IOException {
         return open(Path.of(template), Path.of(layout));
     }
 
-    public static ExcelReport open(Path template, Path layout) throws IOException {
+    public static ExcelBook open(Path template, Path layout) throws IOException {
         var config = Layout.load(layout);
         XSSFWorkbook workbook;
         try (InputStream input = Files.newInputStream(template)) {
             workbook = new XSSFWorkbook(input);
         }
         try {
-            return new ExcelReport(workbook, config);
+            return new ExcelBook(workbook, config);
         } catch (RuntimeException error) {
             try { workbook.close(); } catch (IOException closeError) { error.addSuppressed(closeError); }
             throw error;
@@ -63,7 +63,7 @@ public final class ExcelReport implements AutoCloseable {
     }
 
     void ensureOpen() {
-        if (closed) throw new IllegalStateException("Report is closed");
+        if (closed) throw new IllegalStateException("Book is closed");
     }
 
     @Override public void close() throws IOException {

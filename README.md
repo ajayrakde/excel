@@ -42,9 +42,9 @@ See [`examples/layout.yml`](examples/layout.yml) for a complete example.
 ## Consumer code
 
 ```java
-import io.github.ajayrakde.excel.ExcelReport;
+import io.github.ajayrakde.excel.ExcelBook;
 
-try (var excel = ExcelReport.open("template.xlsx", "layout.yml")) {
+try (var excel = ExcelBook.open("template.xlsx", "layout.yml")) {
     var sheetA = excel.sheet("A");
     sheetA.set("customerName", "Ajay");
     sheetA.table("items")
@@ -67,7 +67,7 @@ The public API has three concepts:
 
 | Class | Purpose |
 | --- | --- |
-| `ExcelReport` | Opens the template and layout, selects sheets, saves and closes |
+| `ExcelBook` | Opens the template and layout, selects sheets, saves and closes |
 | `ExcelSheet` | Sets a named cell and selects a named table |
 | `ExcelTable` | Adds rows to the selected table |
 

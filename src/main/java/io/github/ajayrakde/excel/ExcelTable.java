@@ -6,19 +6,19 @@ import java.util.List;
 
 /** Rows for one configured table. */
 public final class ExcelTable {
-    private final ExcelReport report;
+    private final ExcelBook book;
     private final String name;
     private final Layout.Field config;
     private final List<List<Object>> rows = new ArrayList<>();
 
-    ExcelTable(ExcelReport report, String name, Layout.Field config) {
-        this.report = report;
+    ExcelTable(ExcelBook book, String name, Layout.Field config) {
+        this.book = book;
         this.name = name;
         this.config = config;
     }
 
     public ExcelTable addRow(Object... values) {
-        report.ensureOpen();
+        book.ensureOpen();
         if (values == null || values.length != config.address().columns()) {
             throw new IllegalArgumentException(name + ": each row requires " + config.address().columns() + " values");
         }
