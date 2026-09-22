@@ -18,6 +18,16 @@ sheets:
       type: cell
       range: B5
 
+    # One horizontal range. Consumer code supplies exactly three values.
+    summary:
+      type: row
+      range: E1:G1
+
+    # One vertical range. Consumer code supplies exactly ten values.
+    prices:
+      type: col
+      range: H1:H10
+
     # Existing workbook header is A6:C6. Data starts at A7.
     # YAML headers enable order-independent named values.
     items:

@@ -1,5 +1,6 @@
 import io.github.ajayrakde.excel.ExcelBook;
 import java.nio.file.Path;
+import java.util.Map;
 
 /** Complete consumer example for examples/layout.yml and an existing workbook. */
 public final class ItemsWorkbookExample {
@@ -10,11 +11,15 @@ public final class ItemsWorkbookExample {
             var sheetA = book.sheet("A");
 
             // Named cells: text, boolean, integer, decimal, and blank.
-            sheetA.set("customerName", "Ajay");
-            sheetA.set("approved", true);
-            sheetA.set("itemCount", 5);
-            sheetA.set("discount", 7.5);
-            sheetA.set("optionalNote", null);
+            sheetA.cell("customerName").add("Ajay");
+            sheetA.cell("approved").add(true);
+            sheetA.cell("itemCount").add(5);
+            sheetA.cell("discount").add(7.5);
+            sheetA.cell("optionalNote").add(null);
+
+            // A row and column must exactly match their configured ranges.
+            sheetA.row("summary").add("Total", null, 100);
+            sheetA.col("prices").add(50, 10, 5, 8, 15, 25, 30, 12, 7, 20);
 
             var items = sheetA.table("items");
 
@@ -24,11 +29,12 @@ public final class ItemsWorkbookExample {
                 .set("price", 50)
                 .set("number", 1);
 
-            // Fully qualified tableName.headerName references are also accepted.
-            items.addRow()
-                .set("items.price", 10)
-                .set("items.number", 2)
-                .set("items.itemName", "Pen");
+            // A map also accepts fully qualified tableName.headerName references.
+            items.addRow(Map.of(
+                "items.price", 10,
+                "items.number", 2,
+                "items.itemName", "Pen"
+            ));
 
             // Positional rows remain available even when YAML headers are present.
             items.addRow(3, "Pencil", 5);
@@ -40,7 +46,7 @@ public final class ItemsWorkbookExample {
                 .addRow(4L, 5.5f, 6.75d);
 
             var sheetB = book.sheet("B");
-            sheetB.set("status", "Ready");
+            sheetB.cell("status").add("Ready");
 
             // Existing header, no YAML header names, and no configured row limit.
             sheetB.table("archivedItems")

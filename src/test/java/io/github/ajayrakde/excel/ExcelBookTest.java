@@ -3,6 +3,8 @@ package io.github.ajayrakde.excel;
 import static org.junit.jupiter.api.Assertions.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -43,6 +45,8 @@ class ExcelBookTest {
             sheets:
               A:
                 customerName: {type: cell, range: B1}
+                summary: {type: row, range: 'E1:G1'}
+                prices: {type: col, range: 'H1:H10'}
                 items: {type: table, range: 'A2:C2', hasHeader: true, limit: 5,
                         headers: [number, itemName, price]}
               B:
@@ -52,12 +56,14 @@ class ExcelBookTest {
         Path output = directory.resolve("output.xlsx");
         try (var report = ExcelBook.open(input.toString(), config.toString())) {
             var a = report.sheet("A");
-            a.set("customerName", "Ajay");
+            a.cell("customerName").add("Ajay");
+            a.row("summary").add("Total", null, 100);
+            a.col("prices").add(50, 10, 5, 8, 15, 25, 30, 12, 7, 20);
             var items = a.table("items");
             assertSame(items, report.sheet("A").table("items"));
             items.addRow().set("itemName", "Notebook").set("number", 1).set("price", 50);
-            items.addRow().set("items.price", 10).set("items.number", 2).set("items.itemName", "Pen");
-            report.sheet("B").set("customerName", "Vijay");
+            items.addRow(Map.of("items.price", 10, "items.number", 2, "items.itemName", "Pen"));
+            report.sheet("B").cell("customerName").add("Vijay");
             report.sheet("B").table("items").addRow(1, "Pencil", 5).addRow(2, null, 15);
             report.save(output.toString());
             items.addRow(3, "Pencil", 5).addRow(4, "Eraser", 8).addRow(5, "Ruler", 15);
@@ -68,6 +74,11 @@ class ExcelBookTest {
             var a = book.getSheet("A");
             assertEquals("Name", a.getRow(0).getCell(0).getStringCellValue());
             assertEquals("Ajay", a.getRow(0).getCell(1).getStringCellValue());
+            assertEquals("Total", a.getRow(0).getCell(4).getStringCellValue());
+            assertEquals(CellType.BLANK, a.getRow(0).getCell(5).getCellType());
+            assertEquals(100, a.getRow(0).getCell(6).getNumericCellValue());
+            assertEquals(50, a.getRow(0).getCell(7).getNumericCellValue());
+            assertEquals(20, a.getRow(9).getCell(7).getNumericCellValue());
             assertEquals("Item name", a.getRow(1).getCell(1).getStringCellValue());
             assertEquals(1, a.getRow(2).getCell(0).getNumericCellValue());
             assertEquals("Notebook", a.getRow(2).getCell(1).getStringCellValue());
@@ -93,7 +104,7 @@ class ExcelBookTest {
         Path output = directory.resolve("output.xlsx");
         Files.writeString(output, "existing output");
         try (var report = ExcelBook.open(template(true), config)) {
-            report.sheet("A").set("customerName", "Ajay");
+            report.sheet("A").cell("customerName").add("Ajay");
             var table = report.sheet("A").table("items");
             assertThrows(IllegalArgumentException.class, () -> table.addRow(1, "too short"));
             assertThrows(IllegalArgumentException.class, () -> table.addRow(1, "invalid", new Object()));
@@ -124,7 +135,11 @@ class ExcelBookTest {
         "{type: table, range: 'A2:C2', hasHeader: false, typo: 1}",
         "{type: cell, range: 'A1:B1'}",
         "{type: cell, range: 'A1', hasHeader: true}",
-        "{type: row, range: 'A1:B1'}",
+        "{type: row, range: 'A1:B2'}",
+        "{type: row, range: 'A1:B1', limit: 2}",
+        "{type: col, range: 'A1:B2'}",
+        "{type: col, range: 'A1:A2', hasHeader: false}",
+        "{type: column, range: 'A1:A2'}",
         "{type: table, range: 'A2:C2', hasHeader: true, headers: [number, item]}",
         "{type: table, range: 'A2:C2', hasHeader: true, headers: [number, item, number]}",
         "{type: table, range: 'A2:C2', hasHeader: true, headers: [number, item, 3]}",
@@ -159,22 +174,58 @@ class ExcelBookTest {
             sheets:
               A:
                 name: {type: cell, range: B1}
+                summary: {type: row, range: 'D1:F1'}
+                prices: {type: col, range: 'G1:G3'}
                 items: {type: table, range: 'A2:C2', hasHeader: true,
                         headers: [number, itemName, price]}
             """);
         var report = ExcelBook.open(input, config);
         var sheet = report.sheet("A");
+        var cell = sheet.cell("name");
+        var row = sheet.row("summary");
+        var col = sheet.col("prices");
         var table = sheet.table("items");
         assertThrows(IllegalArgumentException.class, () -> report.sheet("B"));
-        assertThrows(IllegalArgumentException.class, () -> sheet.set("missing", "value"));
-        assertThrows(IllegalArgumentException.class, () -> sheet.set("items", "value"));
+        assertThrows(IllegalArgumentException.class, () -> sheet.cell("missing"));
+        assertThrows(IllegalArgumentException.class, () -> sheet.cell("items"));
+        assertThrows(IllegalArgumentException.class, () -> sheet.row("name"));
+        assertThrows(IllegalArgumentException.class, () -> sheet.col("summary"));
         assertThrows(IllegalArgumentException.class, () -> sheet.table("name"));
+        assertThrows(IllegalArgumentException.class, () -> row.add("too", "short"));
+        assertThrows(IllegalArgumentException.class, () -> col.add(1, 2));
         var namedTableRow = table.addRow();
         assertThrows(IllegalArgumentException.class, () -> namedTableRow.set("unknown", 1));
         report.close();
-        assertThrows(IllegalStateException.class, () -> sheet.set("name", "value"));
+        assertThrows(IllegalStateException.class, () -> cell.add("value"));
+        assertThrows(IllegalStateException.class, () -> row.add(1, 2, 3));
+        assertThrows(IllegalStateException.class, () -> col.add(1, 2, 3));
         assertThrows(IllegalStateException.class, () -> namedTableRow.set("number", 1));
         assertThrows(IllegalStateException.class, () -> table.addRow(1, "item", 5));
+    }
+
+    @Test void validatesNamedMapBeforeAddingItsRow() throws Exception {
+        Path config = layout("""
+            sheets:
+              A:
+                items: {type: table, range: 'A2:C2', hasHeader: true, limit: 1,
+                        headers: [number, itemName, price]}
+            """);
+        Path output = directory.resolve("output.xlsx");
+        try (var report = ExcelBook.open(template(false), config)) {
+            var table = report.sheet("A").table("items");
+            var duplicate = new LinkedHashMap<String, Object>();
+            duplicate.put("number", 1);
+            duplicate.put("items.number", 2);
+            assertThrows(IllegalArgumentException.class, () -> table.addRow(duplicate));
+            assertThrows(IllegalArgumentException.class, () -> table.addRow(Map.of("unknown", 1)));
+            assertThrows(IllegalArgumentException.class, () -> table.addRow(Map.of("price", new Object())));
+            table.addRow(Map.of("number", 1, "itemName", "Notebook", "price", 50));
+            assertThrows(IllegalArgumentException.class, () -> table.addRow(Map.of("number", 2)));
+            report.save(output);
+        }
+        try (var stream = Files.newInputStream(output); var book = new XSSFWorkbook(stream)) {
+            assertEquals("Notebook", book.getSheet("A").getRow(2).getCell(1).getStringCellValue());
+        }
     }
 
     @Test void acceptsLastXlsxRowAndRejectsGrowthBeyondIt() throws Exception {
