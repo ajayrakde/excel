@@ -72,18 +72,17 @@ try (var excel = ExcelReport.open("template.xlsx", "layout.yml")) {
   cell writes apply before table writes. Header preservation concerns the table
   operation itself, not another mapping explicitly targeting those cells.
 
-See `examples/layout.yml` for a complete layout. Existing address-based and
-properties-mapper APIs below remain available and unchanged.
+See `examples/layout.yml` for a complete layout. YAML is the only supported
+named-layout configuration format.
 
 A small Java 17 library for writing explicit cells and rectangular ranges in XLSX
-files. Apache POI is internal. An optional mapper connects your own names to
-addresses; sheet selection stays separate so a layout works on multiple sheets.
+files. Apache POI is internal. The direct address API remains available for
+low-level use without configuration.
 
 ## Usage
 
 ```java
 import io.github.ajayrakde.excel.ExcelBook;
-import io.github.ajayrakde.excel.ExcelMapper;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -104,34 +103,6 @@ try (ExcelBook book = ExcelBook.create()) {
 Use `ExcelBook.open(Path.of("template.xlsx"))` to edit a template. `sheet(name)`
 selects an existing sheet or creates it. `save(path)` replaces an existing output
 file. Close the workbook with try-with-resources; instances are not thread-safe.
-
-## Optional mapper
-
-`examples/sales.properties` defines sheet-independent destinations:
-
-```properties
-sales.customerName=B6
-sales.items=A12:C13
-sales.total=C14
-```
-
-```java
-ExcelMapper mapper = ExcelMapper.load(Path.of("examples/sales.properties"));
-try (ExcelBook book = ExcelBook.create()) {
-    book.sheet("January").write(mapper.resolve("sales.items"), List.of(
-        List.of("Product A", 2, 100), List.of("Product B", 3, 200)));
-    book.sheet("February").write(mapper.resolve("sales.items"), List.of(
-        List.of("Product C", 4, 300), List.of("Product D", 5, 400)));
-    book.save(Path.of("sales.xlsx"));
-}
-```
-
-Alternatively use `ExcelMapper.of(Map.of("sales.items", "A12:C13"))`.
-Mappings are copied and immutable. Missing keys, malformed addresses, blank keys,
-and duplicate properties keys fail clearly. Different keys may share an address.
-For different sheet layouts, load different configurations with the same keys.
-Changing locations requires only changing config (or constants); reload a file
-to pick up its changes. The mapper neither searches cell content nor transforms data.
 
 ## P0 behavior
 
