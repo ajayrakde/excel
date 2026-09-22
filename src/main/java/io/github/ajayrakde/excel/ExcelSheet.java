@@ -3,8 +3,6 @@ package io.github.ajayrakde.excel;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.util.CellRangeAddress;
 
@@ -22,7 +20,7 @@ public final class ExcelSheet {
         this.fields = fields;
     }
 
-    /** Buffers a cell value; a later call with the same name replaces it. */
+    /** Buffers a named cell value; a later call with the same name replaces it. */
     public ExcelSheet set(String name, Object value) {
         field(name, "cell");
         validateValue(value);
@@ -78,10 +76,10 @@ public final class ExcelSheet {
 
     void write(Address address, Object data) {
         for (int r = 0; r < address.rows(); r++) {
-            Row row = sheet.getRow(address.firstRow() + r);
+            org.apache.poi.ss.usermodel.Row row = sheet.getRow(address.firstRow() + r);
             if (row == null) row = sheet.createRow(address.firstRow() + r);
             for (int c = 0; c < address.columns(); c++) {
-                Cell cell = row.getCell(address.firstColumn() + c);
+                org.apache.poi.ss.usermodel.Cell cell = row.getCell(address.firstColumn() + c);
                 if (cell == null) cell = row.createCell(address.firstColumn() + c);
                 Object value = data instanceof List<?> rows ? ((List<?>) rows.get(r)).get(c) : data;
                 cell.setBlank();
@@ -112,4 +110,5 @@ public final class ExcelSheet {
         return new IllegalArgumentException("Data must exactly match destination: "
                 + address.rows() + " row(s) x " + address.columns() + " column(s)");
     }
+
 }

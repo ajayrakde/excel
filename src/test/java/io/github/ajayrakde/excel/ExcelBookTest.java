@@ -43,7 +43,8 @@ class ExcelBookTest {
             sheets:
               A:
                 customerName: {type: cell, range: B1}
-                items: {type: table, range: 'A2:C2', hasHeader: true, limit: 5}
+                items: {type: table, range: 'A2:C2', hasHeader: true, limit: 5,
+                        headers: [number, itemName, price]}
               B:
                 customerName: {type: cell, range: D1}
                 items: {type: table, range: 'B4:D4', hasHeader: false}
@@ -54,7 +55,8 @@ class ExcelBookTest {
             a.set("customerName", "Ajay");
             var items = a.table("items");
             assertSame(items, report.sheet("A").table("items"));
-            items.addRow(1, "Notebook", 50).addRow(2, "Pen", 10);
+            items.addRow().set("itemName", "Notebook").set("number", 1).set("price", 50);
+            items.addRow().set("items.price", 10).set("items.number", 2).set("items.itemName", "Pen");
             report.sheet("B").set("customerName", "Vijay");
             report.sheet("B").table("items").addRow(1, "Pencil", 5).addRow(2, null, 15);
             report.save(output.toString());
@@ -123,6 +125,9 @@ class ExcelBookTest {
         "{type: cell, range: 'A1:B1'}",
         "{type: cell, range: 'A1', hasHeader: true}",
         "{type: row, range: 'A1:B1'}",
+        "{type: table, range: 'A2:C2', hasHeader: true, headers: [number, item]}",
+        "{type: table, range: 'A2:C2', hasHeader: true, headers: [number, item, number]}",
+        "{type: table, range: 'A2:C2', hasHeader: true, headers: [number, item, 3]}",
         "{type: table, range: 'A1048576:C1048576', hasHeader: true}",
         "{type: table, range: 'A1048575:C1048575', hasHeader: false, limit: 3}"
     })
@@ -154,7 +159,8 @@ class ExcelBookTest {
             sheets:
               A:
                 name: {type: cell, range: B1}
-                items: {type: table, range: 'A2:C2', hasHeader: true}
+                items: {type: table, range: 'A2:C2', hasHeader: true,
+                        headers: [number, itemName, price]}
             """);
         var report = ExcelBook.open(input, config);
         var sheet = report.sheet("A");
@@ -163,8 +169,11 @@ class ExcelBookTest {
         assertThrows(IllegalArgumentException.class, () -> sheet.set("missing", "value"));
         assertThrows(IllegalArgumentException.class, () -> sheet.set("items", "value"));
         assertThrows(IllegalArgumentException.class, () -> sheet.table("name"));
+        var namedTableRow = table.addRow();
+        assertThrows(IllegalArgumentException.class, () -> namedTableRow.set("unknown", 1));
         report.close();
         assertThrows(IllegalStateException.class, () -> sheet.set("name", "value"));
+        assertThrows(IllegalStateException.class, () -> namedTableRow.set("number", 1));
         assertThrows(IllegalStateException.class, () -> table.addRow(1, "item", 5));
     }
 
