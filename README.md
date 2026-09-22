@@ -40,7 +40,26 @@ columns; it never needs an ending row.
 - `headers` is an optional compact array. Its order maps names to table columns.
 - Each configured worksheet must already exist in the template.
 
-See [`examples/layout.yml`](examples/layout.yml) for a complete example.
+The checked-in examples cover the entire supported input surface:
+
+- [`examples/layout.yml`](examples/layout.yml) contains multiple sheets; every
+  cell value category; tables with and without physical workbook headers; tables
+  with and without YAML header names; and tables with and without row limits.
+- [`examples/ItemsWorkbookExample.java`](examples/ItemsWorkbookExample.java)
+  fills that layout using scalar values, nulls, every supported numeric Java
+  type, booleans, positional rows, locally named headers, and fully qualified
+  `tableName.headerName` references.
+
+| Possibility | Covered by |
+| --- | --- |
+| Named cell | `A.customerName`, `A.approved`, `A.itemCount`, `A.discount`, `A.optionalNote` |
+| Multiple worksheets | Sheets `A` and `B` |
+| Physical table header | `A.items`, `B.archivedItems` |
+| No physical table header | `A.rawRows`, `B.measurements` |
+| YAML header names | `A.items`, `B.measurements` |
+| Positional table values | `A.rawRows`, `B.archivedItems` |
+| Limited table | `A.items`, `B.measurements` |
+| Unlimited table | `A.rawRows`, `B.archivedItems` |
 
 ## Consumer code
 

@@ -1,21 +1,54 @@
+# One YAML file describes one existing workbook.
 sheets:
   A:
+    # Named cells: demonstrate every supported value category.
     customerName:
       type: cell
       range: B1
+    approved:
+      type: cell
+      range: B2
+    itemCount:
+      type: cell
+      range: B3
+    discount:
+      type: cell
+      range: B4
+    optionalNote:
+      type: cell
+      range: B5
+
+    # Existing workbook header is A6:C6. Data starts at A7.
+    # YAML headers enable order-independent named values.
     items:
       type: table
-      range: A2:C2
+      range: A6:C6
       hasHeader: true
       limit: 5
       headers: [number, itemName, price]
-  B:
-    customerName:
-      type: cell
-      range: D1
-    items:
+
+    # No workbook header, row limit, or YAML header names.
+    # Data starts at E6 and must be supplied positionally.
+    rawRows:
       type: table
-      range: B4:D4
+      range: E6:G6
+      hasHeader: false
+
+  B:
+    status:
+      type: cell
+      range: B1
+
+    # Existing workbook header, positional values, and unlimited data rows.
+    archivedItems:
+      type: table
+      range: A3:C3
       hasHeader: true
-      limit: 10
-      headers: [number, itemName, price]
+
+    # Logical YAML headers without a header row in the workbook.
+    measurements:
+      type: table
+      range: E3:F3
+      hasHeader: false
+      limit: 3
+      headers: [label, value]
