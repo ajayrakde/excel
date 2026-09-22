@@ -1,1 +1,96 @@
-# excel
+# Excel writer — P0
+
+A small Java 17 library for writing explicit cells and rectangular ranges in XLSX
+files. Apache POI is internal. An optional mapper connects your own names to
+addresses; sheet selection stays separate so a layout works on multiple sheets.
+
+## Usage
+
+```java
+import io.github.ajayrakde.excel.ExcelBook;
+import io.github.ajayrakde.excel.ExcelMapper;
+import java.nio.file.Path;
+import java.util.List;
+
+try (ExcelBook book = ExcelBook.create()) {
+    var sheet = book.sheet("January");
+    sheet.write("B6", "Ajay");
+    sheet.write("B12:D12", List.of("Product", 2, 500));
+    sheet.write("G12:G14", List.of(1000, 1500, 800));
+    sheet.write("A25:B27", List.of(
+        List.of("Name", "Amount"),
+        List.of("A", 100),
+        List.of("B", 200)
+    ));
+    book.save(Path.of("output.xlsx"));
+}
+```
+
+Use `ExcelBook.open(Path.of("template.xlsx"))` to edit a template. `sheet(name)`
+selects an existing sheet or creates it. `save(path)` replaces an existing output
+file. Close the workbook with try-with-resources; instances are not thread-safe.
+
+## Optional mapper
+
+`examples/sales.properties` defines sheet-independent destinations:
+
+```properties
+sales.customerName=B6
+sales.items=A12:C13
+sales.total=C14
+```
+
+```java
+ExcelMapper mapper = ExcelMapper.load(Path.of("examples/sales.properties"));
+try (ExcelBook book = ExcelBook.create()) {
+    book.sheet("January").write(mapper.resolve("sales.items"), List.of(
+        List.of("Product A", 2, 100), List.of("Product B", 3, 200)));
+    book.sheet("February").write(mapper.resolve("sales.items"), List.of(
+        List.of("Product C", 4, 300), List.of("Product D", 5, 400)));
+    book.save(Path.of("sales.xlsx"));
+}
+```
+
+Alternatively use `ExcelMapper.of(Map.of("sales.items", "A12:C13"))`.
+Mappings are copied and immutable. Missing keys, malformed addresses, blank keys,
+and duplicate properties keys fail clearly. Different keys may share an address.
+For different sheet layouts, load different configurations with the same keys.
+Changing locations requires only changing config (or constants); reload a file
+to pick up its changes. The mapper neither searches cell content nor transforms data.
+
+## P0 behavior
+
+| Input | Behavior |
+| --- | --- |
+| Scalar | Exactly one cell |
+| Flat `List<?>` | One row left-to-right or one column top-to-bottom |
+| List of row lists | Rectangular matrix, including one-row/one-column matrices |
+| Size mismatch, empty list, ragged matrix | Rejected before writing |
+| `null` | Clears the destination cell; use `Arrays.asList` for null list elements |
+| Existing cell | Replaces value/formula, retains formatting |
+| Merged overlap | Rejected before writing, including the merge's top-left cell |
+| String | Literal text, including text starting with `=`; max 32767 characters |
+| Boolean | Excel boolean |
+| Byte, Short, Integer, Long, Float, Double | Excel number; must be finite |
+| Other types | Rejected; convert dates/identifiers to text explicitly in P0 |
+
+Ranges are inclusive and must be ordered from top-left to bottom-right. A1
+addresses accept lowercase and `$` markers; sheet-qualified addresses, whole
+rows/columns, and disjoint ranges are not supported. Limits are XLSX limits:
+XFD1048576. Numeric values use Excel's double precision (roughly 15 significant
+digits); use strings for long identifiers or values needing exact decimal text.
+
+Validation of shape, values, and merged overlaps completes before mutation.
+This is not a transactional guarantee against I/O failure, resource exhaustion,
+or concurrent mutation of input lists. No broadcasting, truncation, implicit
+range expansion, or clearing outside the destination occurs.
+
+Search, relative positioning, formatting APIs, formula generation, merge/unmerge,
+object-field mapping, and pattern filling are outside P0.
+
+## Build and test
+
+Requires JDK 17 and Gradle 8.14.3. Run `gradle build` (or `gradle test` for tests only).
+GitHub Actions installs this Gradle version and runs the build on pushes
+and pull requests. Tests reopen generated workbooks to verify actual saved cell
+types, values, shared layouts, template preservation, and validation behavior.
