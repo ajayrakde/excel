@@ -22,24 +22,9 @@ public final class ExcelSheet {
      * completes before cells are changed; merged overlaps are rejected.
      */
     public ExcelSheet write(String destination, Object data) {
-        book.ensureOpen();
+        validate(destination, data);
         Address address = Address.parse(destination);
-        boolean matrix = data instanceof List<?> list && !list.isEmpty()
-                && list.get(0) instanceof List<?>;
-        validateShape(address, data, matrix);
-        for (CellRangeAddress merged : sheet.getMergedRegions()) {
-            if (address.firstRow() <= merged.getLastRow() && address.lastRow() >= merged.getFirstRow()
-                    && address.firstColumn() <= merged.getLastColumn()
-                    && address.lastColumn() >= merged.getFirstColumn()) {
-                throw new IllegalArgumentException("Destination " + destination
-                        + " overlaps merged cells " + merged.formatAsString());
-            }
-        }
-        for (int r = 0; r < address.rows(); r++) {
-            for (int c = 0; c < address.columns(); c++) {
-                validateValue(valueAt(address, data, matrix, r, c));
-            }
-        }
+        boolean matrix = isMatrix(data);
         for (int r = 0; r < address.rows(); r++) {
             Row row = sheet.getRow(address.firstRow() + r);
             if (row == null) row = sheet.createRow(address.firstRow() + r);
@@ -54,6 +39,30 @@ public final class ExcelSheet {
             }
         }
         return this;
+    }
+
+    void validate(String destination, Object data) {
+        book.ensureOpen();
+        Address address = Address.parse(destination);
+        boolean matrix = isMatrix(data);
+        validateShape(address, data, matrix);
+        for (CellRangeAddress merged : sheet.getMergedRegions()) {
+            if (address.firstRow() <= merged.getLastRow() && address.lastRow() >= merged.getFirstRow()
+                    && address.firstColumn() <= merged.getLastColumn()
+                    && address.lastColumn() >= merged.getFirstColumn()) {
+                throw new IllegalArgumentException("Destination " + destination
+                        + " overlaps merged cells " + merged.formatAsString());
+            }
+        }
+        for (int r = 0; r < address.rows(); r++) {
+            for (int c = 0; c < address.columns(); c++) {
+                validateValue(valueAt(address, data, matrix, r, c));
+            }
+        }
+    }
+
+    private static boolean isMatrix(Object data) {
+        return data instanceof List<?> list && !list.isEmpty() && list.get(0) instanceof List<?>;
     }
 
     private static void validateShape(Address address, Object data, boolean matrix) {
@@ -83,7 +92,7 @@ public final class ExcelSheet {
         return values.get(address.rows() == 1 ? column : row);
     }
 
-    private static void validateValue(Object value) {
+    static void validateValue(Object value) {
         if (value == null || value instanceof Boolean) return;
         if (value instanceof String text) {
             if (text.length() > 32_767) throw new IllegalArgumentException("Cell text exceeds 32767 characters");

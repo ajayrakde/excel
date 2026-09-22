@@ -43,6 +43,13 @@ public final class ExcelBook implements AutoCloseable {
         if (closed) throw new IllegalStateException("Workbook is closed");
     }
 
+    ExcelSheet existingSheet(String name) {
+        ensureOpen();
+        Sheet sheet = workbook.getSheet(name);
+        if (sheet == null) throw new IllegalArgumentException("Template has no sheet: " + name);
+        return new ExcelSheet(this, sheet);
+    }
+
     @Override public void close() throws IOException {
         if (!closed) {
             closed = true;
