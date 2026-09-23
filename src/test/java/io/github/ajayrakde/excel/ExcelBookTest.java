@@ -59,6 +59,9 @@ class ExcelBookTest {
             a.cell("customerName").add("Ajay");
             a.row("summary").add("Total", null, 100);
             a.col("prices").add(50, 10, 5, 8, 15, 25, 30, 12, 7, 20);
+            a.cell("J1").add("Direct");
+            a.row("J2:L2").add("Direct row", 2, true);
+            a.col("M1:M3").add(7, 8, 9);
             var items = a.table("items");
             assertSame(items, report.sheet("A").table("items"));
             items.addRow().set("itemName", "Notebook").set("number", 1).set("price", 50);
@@ -79,6 +82,10 @@ class ExcelBookTest {
             assertEquals(100, a.getRow(0).getCell(6).getNumericCellValue());
             assertEquals(50, a.getRow(0).getCell(7).getNumericCellValue());
             assertEquals(20, a.getRow(9).getCell(7).getNumericCellValue());
+            assertEquals("Direct", a.getRow(0).getCell(9).getStringCellValue());
+            assertEquals("Direct row", a.getRow(1).getCell(9).getStringCellValue());
+            assertTrue(a.getRow(1).getCell(11).getBooleanCellValue());
+            assertEquals(9, a.getRow(2).getCell(12).getNumericCellValue());
             assertEquals("Item name", a.getRow(1).getCell(1).getStringCellValue());
             assertEquals(1, a.getRow(2).getCell(0).getNumericCellValue());
             assertEquals("Notebook", a.getRow(2).getCell(1).getStringCellValue());
@@ -191,6 +198,9 @@ class ExcelBookTest {
         assertThrows(IllegalArgumentException.class, () -> sheet.row("name"));
         assertThrows(IllegalArgumentException.class, () -> sheet.col("summary"));
         assertThrows(IllegalArgumentException.class, () -> sheet.table("name"));
+        assertThrows(IllegalArgumentException.class, () -> sheet.cell("A1:B1"));
+        assertThrows(IllegalArgumentException.class, () -> sheet.row("A1:B2"));
+        assertThrows(IllegalArgumentException.class, () -> sheet.col("A1:B2"));
         assertThrows(IllegalArgumentException.class, () -> row.add("too", "short"));
         assertThrows(IllegalArgumentException.class, () -> col.add(1, 2));
         var namedTableRow = table.addRow();

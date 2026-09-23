@@ -21,6 +21,11 @@ public final class ItemsWorkbookExample {
             sheetA.row("summary").add("Total", null, 100);
             sheetA.col("prices").add(50, 10, 5, 8, 15, 25, 30, 12, 7, 20);
 
+            // Direct references are optional alternatives to YAML field names.
+            sheetA.cell("J1").add("Direct");
+            sheetA.row("J2:L2").add("Direct row", 2, true);
+            sheetA.col("M1:M3").add(7, 8, 9);
+
             var items = sheetA.table("items");
 
             // Named values can be supplied in any order using local header names.

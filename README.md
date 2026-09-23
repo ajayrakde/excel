@@ -1,8 +1,8 @@
 # Excel writer
 
 A small Java 17 library that fills named cells, rows, columns, and tables in an existing XLSX
-template. Test scripts use names from a YAML layout and never handle cell
-coordinates in Java.
+template. Test scripts can use names from a YAML layout or direct Excel
+references when a small one-off write is clearer.
 
 ## Layout
 
@@ -41,6 +41,17 @@ used by consumer code. A cell has one exact address. A row is a one-row range.
 A column is a one-column range. A table range is its first row and fixes its
 columns; it never needs an ending row.
 
+Cells, rows, and columns also accept direct references without a YAML field:
+
+```java
+sheet.cell("B1").add("Ajay");
+sheet.row("A10:E10").add("Total", 5, 100, "Paid", true);
+sheet.col("G2:G6").add(50, 10, 5, 8, 15);
+```
+
+Named and direct forms can be mixed. Tables remain YAML-mapped because their
+header behavior, optional limit, and logical header names are layout metadata.
+
 - `hasHeader: true` preserves the configured row and starts data on the next row.
 - `hasHeader: false` starts data on the configured row.
 - `limit` is optional. It caps data rows and does not count the header.
@@ -63,6 +74,7 @@ The checked-in examples cover the entire supported input surface:
 | Named cell | `A.customerName`, `A.approved`, `A.itemCount`, `A.discount`, `A.optionalNote` |
 | Named row | `A.summary` |
 | Named column | `A.prices` |
+| Direct cell, row, and column references | `B1`, `A10:E10`, `G2:G6` |
 | Multiple worksheets | Sheets `A` and `B` |
 | Physical table header | `A.items`, `B.archivedItems` |
 | No physical table header | `A.rawRows`, `B.measurements` |
@@ -82,6 +94,11 @@ try (var excel = ExcelBook.open("template.xlsx", "layout.yml")) {
     sheetA.cell("customerName").add("Ajay");
     sheetA.row("summary").add("Total", "", 100);
     sheetA.col("prices").add(50, 10, 5, 8, 15, 25, 30, 12, 7, 20);
+
+    // Direct references are useful for writes that do not need a YAML name.
+    sheetA.cell("J1").add("Direct");
+    sheetA.row("J2:L2").add("Direct row", 2, true);
+    sheetA.col("M1:M3").add(7, 8, 9);
 
     var items = sheetA.table("items");
     items.addRow()
@@ -120,7 +137,7 @@ The public API has three concepts:
   double values, and `null`. A null clears the target cell.
 - Strings beginning with `=` remain literal strings; formulas are not generated.
 - Every table row must contain exactly the number of columns declared by its range.
-- Every row or column input must exactly match its configured range.
+- Every row or column input must exactly match its configured or direct range.
 - Header names are unique and must match the table width. Within a selected table,
   use `itemName`; the fully qualified form `items.itemName` is also accepted.
 - Numbering is explicit data supplied to `addRow`; it is not generated.
