@@ -2,8 +2,8 @@ package io.github.ajayrakde.excel;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /** Rows for one configured table. */
@@ -12,11 +12,15 @@ public final class ExcelTable {
     private final String name;
     private final Layout.Field config;
     private final List<List<Object>> rows = new ArrayList<>();
+    private final Map<String, Integer> headerIndexes;
 
     ExcelTable(ExcelBook book, String name, Layout.Field config) {
         this.book = book;
         this.name = name;
         this.config = config;
+        Map<String, Integer> indexes = new LinkedHashMap<>();
+        for (int i = 0; i < config.headers().size(); i++) indexes.put(config.headers().get(i), i);
+        this.headerIndexes = Map.copyOf(indexes);
     }
 
     public ExcelTable addRow(Object... values) {
@@ -30,18 +34,55 @@ public final class ExcelTable {
         return this;
     }
 
+    /** Adds a row using configured header names in any order. */
+    public ExcelTable addRow(Map<String, ?> namedValues) {
+        book.ensureOpen();
+        requireHeaders();
+        if (namedValues == null) throw new IllegalArgumentException(name + ": named values are required");
+
+        Map<Integer, Object> resolved = new LinkedHashMap<>();
+        for (var entry : namedValues.entrySet()) {
+            int index = resolveHeader(entry.getKey());
+            if (resolved.containsKey(index)) {
+                throw new IllegalArgumentException(name + ": header supplied more than once: " + entry.getKey());
+            }
+            ExcelSheet.validateValue(entry.getValue());
+            resolved.put(index, entry.getValue());
+        }
+
+        checkCanAdd();
+        List<Object> values = emptyRow();
+        resolved.forEach(values::set);
+        rows.add(values);
+        return this;
+    }
+
     /** Adds an empty row that can be populated by configured header name. */
     public NamedRow addRow() {
         book.ensureOpen();
-        if (config.headers().isEmpty()) {
+        requireHeaders();
+        checkCanAdd();
+        List<Object> values = emptyRow();
+        rows.add(values);
+        return new NamedRow(values);
+    }
+
+    private void requireHeaders() {
+        if (headerIndexes.isEmpty()) {
             throw new IllegalStateException(name + ": YAML headers are required for named values");
         }
-        checkCanAdd();
-        List<Object> values = new ArrayList<>(java.util.Collections.nCopies(config.address().columns(), null));
-        rows.add(values);
-        Map<String, Integer> indexes = new LinkedHashMap<>();
-        for (int i = 0; i < config.headers().size(); i++) indexes.put(config.headers().get(i), i);
-        return new NamedRow(values, Map.copyOf(indexes));
+    }
+
+    private List<Object> emptyRow() {
+        return new ArrayList<>(java.util.Collections.nCopies(config.address().columns(), null));
+    }
+
+    private int resolveHeader(String header) {
+        String localName = header != null && header.startsWith(name + ".")
+                ? header.substring(name.length() + 1) : header;
+        Integer index = headerIndexes.get(localName);
+        if (index == null) throw new IllegalArgumentException("Unknown table header: " + header);
+        return index;
     }
 
     private void checkCanAdd() {
@@ -72,19 +113,14 @@ public final class ExcelTable {
 
     public final class NamedRow {
         private final List<Object> values;
-        private final Map<String, Integer> indexes;
 
-        private NamedRow(List<Object> values, Map<String, Integer> indexes) {
+        private NamedRow(List<Object> values) {
             this.values = values;
-            this.indexes = indexes;
         }
 
         public NamedRow set(String header, Object value) {
             book.ensureOpen();
-            String localName = header != null && header.startsWith(name + ".")
-                    ? header.substring(name.length() + 1) : header;
-            Integer index = indexes.get(localName);
-            if (index == null) throw new IllegalArgumentException("Unknown table header: " + header);
+            int index = resolveHeader(header);
             ExcelSheet.validateValue(value);
             values.set(index, value);
             return this;

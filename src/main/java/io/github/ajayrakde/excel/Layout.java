@@ -5,11 +5,11 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.HashSet;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
@@ -41,8 +41,8 @@ final class Layout {
                 String context = sheet + "." + name;
                 Map<?, ?> config = mapping(field.getValue(), context);
                 String type = text(config.get("type"), context + ".type");
-                if (!Set.of("cell", "table").contains(type)) {
-                    throw new IllegalArgumentException(context + ": type must be cell or table");
+                if (!Set.of("cell", "row", "col", "table").contains(type)) {
+                    throw new IllegalArgumentException(context + ": type must be cell, row, col, or table");
                 }
                 keys(config, type.equals("table")
                         ? Set.of("type", "range", "hasHeader", "limit", "headers")
@@ -53,10 +53,7 @@ final class Layout {
                 catch (IllegalArgumentException error) {
                     throw new IllegalArgumentException(context + ": " + error.getMessage(), error);
                 }
-                if (address.rows() != 1 || (type.equals("cell") && address.columns() != 1)) {
-                    throw new IllegalArgumentException(context + ": range must identify "
-                            + (type.equals("cell") ? "one cell" : "only the first row, such as A2:C2"));
-                }
+                validateShape(context, type, address);
                 boolean hasHeader = false;
                 Integer limit = null;
                 List<String> headers = List.of();
@@ -98,6 +95,27 @@ final class Layout {
             result.put(sheet, Map.copyOf(parsed));
         }
         return Map.copyOf(result);
+    }
+
+    private static void validateShape(String context, String type, Address address) {
+        switch (type) {
+            case "cell" -> {
+                if (address.rows() != 1 || address.columns() != 1) {
+                    throw new IllegalArgumentException(context + ": range must identify one cell");
+                }
+            }
+            case "row", "table" -> {
+                if (address.rows() != 1) {
+                    throw new IllegalArgumentException(context + ": range must identify one row, such as A2:C2");
+                }
+            }
+            case "col" -> {
+                if (address.columns() != 1) {
+                    throw new IllegalArgumentException(context + ": range must identify one column, such as A2:A11");
+                }
+            }
+            default -> throw new IllegalStateException("Unexpected field type: " + type);
+        }
     }
 
     private static Map<?, ?> mapping(Object value, String context) {
